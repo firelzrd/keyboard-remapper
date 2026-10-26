@@ -42,13 +42,6 @@ keyboard-remapper                           # またはアプリメニューの�
 
 `keyboard-remapper-ctl doctor` でセットアップを診断できます。アンインストールは `sudo ./uninstall.sh`。
 
-### 旧名「Remapper」からの移行
-
-このプロジェクトは以前「Remapper」という名前でした。`sudo ./install.sh` が旧サービス・旧コマンド
-(`remapper-daemon`、`remapper-gtk`、`remapper-control`) を削除し、設定は自動で引き継がれます
-(`~/.config/remapper` → `~/.config/keyboard-remapper`、`/var/lib/remapper` → `/var/lib/keyboard-remapper`)。
-そのあと `sudo systemctl enable --now keyboard-remapperd` を実行してください。
-
 ## 仕組み
 
 ```

@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import tempfile
 from dataclasses import dataclass, field
 
 from . import layouts
 from .mapping import Preset
-
 
 # manual: the user's own (drag) order; keyboard: by key position; <column>-asc/desc: header clicks
 SORT_MODES = ("manual", "keyboard", "trigger-asc", "trigger-desc", "action-asc", "action-desc")
@@ -19,12 +17,6 @@ SORT_MODES = ("manual", "keyboard", "trigger-asc", "trigger-desc", "action-asc",
 def config_dir() -> str:
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
     return os.path.join(base, "keyboard-remapper")
-
-
-def legacy_config_path() -> str:
-    """Where this program kept its config before it was renamed from "Remapper"."""
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return os.path.join(base, "remapper", "config.json")
 
 
 def _size(value) -> str:
@@ -59,23 +51,10 @@ class DeviceConfig:
 class Config:
     def __init__(self, path: str | None = None):
         self.path = path or os.path.join(config_dir(), "config.json")
-        if path is None:
-            self._migrate_legacy()
         self.devices: dict[str, DeviceConfig] = {}
         self.last_model: str = ""
         self.sort: str = "keyboard"          # list order, see SORT_MODES
         self.load()
-
-    def _migrate_legacy(self) -> None:
-        """Pick up the config of the old "Remapper" (copied, the old file is left alone)."""
-        old = legacy_config_path()
-        if os.path.exists(self.path) or not os.path.exists(old):
-            return
-        try:
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            shutil.copy2(old, self.path)
-        except OSError:
-            pass
 
     def load(self) -> None:
         try:

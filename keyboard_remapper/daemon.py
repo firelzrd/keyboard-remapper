@@ -13,7 +13,6 @@ import asyncio
 import json
 import logging
 import os
-import shutil
 import signal
 import socket
 import struct
@@ -31,7 +30,6 @@ log = logging.getLogger("keyboard_remapper.daemon")
 
 DEFAULT_SOCKET = "/run/keyboard-remapper/keyboard-remapper.sock"
 DEFAULT_STATE = "/var/lib/keyboard-remapper/state.json"
-LEGACY_STATE = "/var/lib/remapper/state.json"      # before the rename from "Remapper"
 CAPTURE_TIMEOUT_S = 25.0
 RESCAN_INTERVAL_S = 1.0
 GRAB_RETRY_S = 0.03
@@ -170,7 +168,6 @@ class Daemon:
     def _load_state(self) -> None:
         if not self.state_path:
             return
-        self._migrate_legacy_state()
         try:
             with open(self.state_path) as f:
                 data = json.load(f)
@@ -180,16 +177,6 @@ class Daemon:
             pass
         except (OSError, ValueError):
             log.warning("could not read %s", self.state_path)
-
-    def _migrate_legacy_state(self) -> None:
-        if self.state_path != DEFAULT_STATE or os.path.exists(self.state_path) or not os.path.exists(LEGACY_STATE):
-            return
-        try:
-            os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
-            shutil.copy2(LEGACY_STATE, self.state_path)
-            log.info("migrated state from %s", LEGACY_STATE)
-        except OSError:
-            log.warning("could not migrate %s", LEGACY_STATE)
 
     def _save_state(self) -> None:
         if not self.state_path:

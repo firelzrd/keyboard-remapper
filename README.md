@@ -44,13 +44,6 @@ keyboard-remapper                           # or "Keyboard Remapper" in the appl
 `keyboard-remapper-ctl doctor` checks your setup (including that the running service matches the installed version; after an
 upgrade run `sudo systemctl restart keyboard-remapperd`). `keyboard-remapper --version` prints the version. Uninstall with `sudo ./uninstall.sh`.
 
-### Upgrading from "Remapper"
-
-This project was called *Remapper* before. `sudo ./install.sh` removes the old service, commands and files
-(`remapper-daemon`, `remapper-gtk`, `remapper-control`), and your mappings are carried over automatically
-(`~/.config/remapper` → `~/.config/keyboard-remapper`, `/var/lib/remapper` → `/var/lib/keyboard-remapper`).
-Then run `sudo systemctl enable --now keyboard-remapperd`.
-
 ## How it works
 
 ```

@@ -16,15 +16,6 @@ fi
 SRC=$(cd "$(dirname "$0")" && pwd)
 LIB="$PREFIX/lib/keyboard-remapper"
 
-# Remove what the program was installed as before it was renamed from "Remapper".
-# Your presets are kept: they are copied to the new locations on first start.
-if [ -z "$DESTDIR" ]; then
-  systemctl disable --now remapper-daemon 2>/dev/null || true
-  rm -f /etc/systemd/system/remapper-daemon.service /etc/modules-load.d/remapper.conf
-  rm -f "$PREFIX/bin/remapper-daemon" "$PREFIX/bin/remapper-control" "$PREFIX/bin/remapper-gtk"
-  rm -rf "$PREFIX/lib/remapper"
-fi
-
 install -d "$DESTDIR$LIB" "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/share/applications" \
   "$DESTDIR$PREFIX/share/icons/hicolor/scalable/apps" "$DESTDIR/etc/systemd/system" "$DESTDIR/etc/modules-load.d"
 rm -rf "$DESTDIR$LIB/keyboard_remapper"
@@ -50,6 +41,5 @@ if [ -z "$DESTDIR" ]; then
   gtk-update-icon-cache -q "$PREFIX/share/icons/hicolor" 2>/dev/null || true
   echo "Installed. Start the background service with:"
   echo "  sudo systemctl enable --now keyboard-remapperd"
-  [ -d /var/lib/remapper ] && echo "(your previous settings are carried over automatically)"
   echo "then launch 'Keyboard Remapper' from your application menu (or run keyboard-remapper)."
 fi

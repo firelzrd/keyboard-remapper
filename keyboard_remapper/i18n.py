@@ -5,7 +5,7 @@ import os
 
 
 def _detect() -> str:
-    forced = os.environ.get("KEYBOARD_REMAPPER_LANG") or os.environ.get("REMAPPER_LANG")
+    forced = os.environ.get("KEYBOARD_REMAPPER_LANG")
     if forced:
         return "ja" if forced.lower().startswith("ja") else "en"
     for var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):

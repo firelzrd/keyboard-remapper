@@ -13,7 +13,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GObject, Gtk  # noqa: E402
 
-FORCE_LEGACY = bool(os.environ.get("KEYBOARD_REMAPPER_COMPAT") or os.environ.get("REMAPPER_COMPAT"))
+FORCE_LEGACY = bool(os.environ.get("KEYBOARD_REMAPPER_COMPAT"))
 HAS_SPLIT = hasattr(Adw, "OverlaySplitView") and hasattr(Adw, "Breakpoint") and not FORCE_LEGACY
 HAS_BANNER = hasattr(Adw, "Banner") and not FORCE_LEGACY
 HAS_ABOUT_DIALOG = hasattr(Adw, "AboutDialog") and not FORCE_LEGACY

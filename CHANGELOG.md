@@ -32,5 +32,4 @@ First stable release.
 - `keyboard-remapperd` (root, systemd) with persistent state, hotplug, LED relay, peer-checked socket;
   `keyboard-remapper-ctl` (`list`, `apply`, `start`, `stop`, `monitor [--output]`, `doctor`).
 - Runs on Ubuntu 22.04 or newer (GTK 4.6+, libadwaita 1.0+, Python 3.10+).
-- Settings written under the former name "Remapper" are carried over automatically.
 - `--version` on every command; the GUI warns when the running service is not the installed version.

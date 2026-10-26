@@ -12,7 +12,6 @@ from evdev import ecodes as e
 from . import keys
 
 VIRTUAL_NAME = "Keyboard Remapper virtual keyboard"
-LEGACY_VIRTUAL_NAMES = ("Remapper virtual keyboard",)      # created by versions before the rename
 
 # (type, code, value)
 Event = tuple[int, int, int]
@@ -202,7 +201,7 @@ class EvdevBackend(Backend):
         try:
             caps = dev.capabilities()
             ks = set(caps.get(e.EV_KEY, []))
-            if dev.name == VIRTUAL_NAME or dev.name in LEGACY_VIRTUAL_NAMES or not ks:
+            if dev.name == VIRTUAL_NAME or not ks:
                 return None
             if e.EV_REL in caps or e.EV_ABS in caps:
                 return None
