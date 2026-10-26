@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keyboard-remapper"
+dynamic = ["version"]
+description = "Keyboard remapper for Linux with a modern GTK4 GUI and no modifier-combo stalls"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+dependencies = ["evdev>=1.4"]
+
+[project.scripts]
+keyboard-remapperd = "keyboard_remapper.daemon:main"
+keyboard-remapper-ctl = "keyboard_remapper.cli:main"
+
+[project.gui-scripts]
+keyboard-remapper = "keyboard_remapper.gui.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "keyboard_remapper.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["keyboard_remapper*"]

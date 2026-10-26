@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard Remapper
+Name[ja]=Keyboard Remapper (キーボード割り当て)
+Comment=Remap keyboard keys and shortcuts
+Comment[ja]=キーボードのキーやショートカットを割り当てる
+Exec=keyboard-remapper
+Icon=net.securejpn.Remapper
+Terminal=false
+Categories=Settings;HardwareSettings;GTK;
+Keywords=keyboard;remap;keymap;shortcut;キーボード;割り当て;
+StartupNotify=true
