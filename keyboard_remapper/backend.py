@@ -28,6 +28,7 @@ class NodeInfo:
     bus: int
     is_main: bool      # has the alphabet: a real keyboard rather than a consumer-control node
     uniq: str = ""     # unique id (Bluetooth address); tells apart devices that share a phys
+    layout_hint: str = ""   # "jis" when the keyboard reports Yen / Ro keys (only JIS keyboards have them)
 
     @property
     def phys_base(self) -> str:
@@ -214,7 +215,8 @@ class EvdevBackend(Backend):
                                           e.KEY_F1, e.KEY_LEFTCTRL}):
                 return None
             return NodeInfo(path, dev.name, dev.phys or "", dev.info.vendor, dev.info.product,
-                            dev.info.bustype, is_main, dev.uniq or "")
+                            dev.info.bustype, is_main, dev.uniq or "",
+                            "jis" if ks & {e.KEY_YEN, e.KEY_RO} else "")
         finally:
             dev.close()
 

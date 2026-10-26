@@ -16,8 +16,9 @@ should type**, and review or change the mapping of any key or combination such a
   a moment. Keyboard Remapper sends **all output through a single virtual keyboard created once at startup**, so
   the source never switches (covered by automated tests).
 - ANSI / ISO / **JIS** layouts, full-size or tenkeyless. Japanese keys (Zenkaku/Hankaku, Muhenkan, Henkan, Kana) included.
-- **Apple keyboards (Magic Keyboard etc.)**: Apple layouts (fn / control / option / command, half-height arrows, Eject) are
-  picked automatically, and **Fn works as a layer key** (`Fn + H → ←`). Keys the drawn layout lacks show up in an "Other keys" strip.
+- **Apple keyboards (Magic Keyboard etc.)**: the layout (with or without numeric keypad; US / ISO / JIS) is picked automatically
+  from the product id, and **Fn works as a layer key** (`Fn + H → ←`). The top-right key is one cap for Eject (2015) and Lock
+  (later keyboards). Keys the drawn layout lacks show up in an "Other keys" strip.
 - Hold a modifier (or pick Ctrl / Shift / Alt / Super on screen) and every keycap shows what that
   combination does.
 - Actions: key / shortcut, key sequence (with pauses), disable.

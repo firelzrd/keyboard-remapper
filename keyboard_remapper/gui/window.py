@@ -375,12 +375,15 @@ class MainWindow(Adw.ApplicationWindow):
         new = d["model"] not in self.config.devices
         cfg = self.config.device(d["model"], d["name"], system_standard())
         if new and self._is_apple(d):
-            cfg.size = "apple-num" if "numeric" in d["name"].lower() else "apple"
+            cfg.size = layouts.APPLE_PRODUCT_SIZE.get(
+                d.get("product"), "apple-num" if "numeric" in d["name"].lower() else "apple")
+            if d.get("layout_hint") == "jis":
+                cfg.standard = "jis"
         return cfg
 
     @staticmethod
     def _is_apple(d: dict) -> bool:
-        return d.get("vendor") in (0x05AC, 0x004C) or "apple" in d["name"].lower() \
+        return d.get("vendor") in layouts.APPLE_VENDORS or "apple" in d["name"].lower() \
             or "magic keyboard" in d["name"].lower()
 
     def _update_empty(self) -> None:

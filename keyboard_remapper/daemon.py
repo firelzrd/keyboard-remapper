@@ -387,6 +387,7 @@ class Daemon:
                 "id": g.id, "model": g.model, "name": g.name,
                 "vendor": main.vendor if main else 0, "product": main.product if main else 0,
                 "bus": main.bus if main else 0,
+                "layout_hint": main.layout_hint if main else "",
                 "applied": bool(entry and entry.get("enabled", True)),
                 "configured": entry is not None,
             })

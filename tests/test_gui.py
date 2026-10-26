@@ -580,3 +580,38 @@ def test_keycap_text_uses_the_system_ui_font(env):
     assert "set_family" not in src and "Noto Sans" not in src
     win, d, _ = env
     assert win.keyboard.get_pango_context().get_font_description().get_family()
+
+
+def test_apple_keyboard_layout_is_chosen_from_product_id_and_jis_hint(env):
+    win, d, _ = env
+    cases = [
+        ({"model": "05ac:0267", "name": "Apple Inc. Magic Keyboard", "vendor": 0x05AC, "product": 0x0267}, "apple", None),
+        ({"model": "004c:029c", "name": "Magic Keyboard", "vendor": 0x004C, "product": 0x029C}, "apple", None),
+        ({"model": "004c:029a", "name": "Magic Keyboard with Touch ID", "vendor": 0x004C, "product": 0x029A,
+          "layout_hint": "jis"}, "apple", "jis"),
+        ({"model": "05ac:029f", "name": "Magic Keyboard with Numeric Keypad", "vendor": 0x05AC, "product": 0x029F},
+         "apple-num", None),
+        ({"model": "05ac:ffff", "name": "Apple Magic Keyboard", "vendor": 0x05AC, "product": 0xFFFF}, "apple", None),
+    ]
+    for dev, size, standard in cases:
+        cfg = win._ensure_config(dev)
+        assert cfg.size == size, dev["model"]
+        if standard:
+            assert cfg.standard == standard
+    # a non-Apple keyboard is left alone
+    other = win._ensure_config({"model": "1111:2222", "name": "Some Keyboard", "vendor": 0x1111, "product": 0x2222})
+    assert other.size == "full"
+
+
+def test_lock_key_press_lights_the_eject_cap_on_apple_layouts(env):
+    """KEY_COFFEE (the Lock key of newer Apple keyboards) and KEY_EJECTCD share one cap."""
+    win, d, _ = env
+    from keyboard_remapper import layouts
+    win.keyboard.set_layout(layouts.build("jis", "apple"))
+    win.held.add(keys.name_to_code("COFFEE"))
+    win.cfg().preset.set(Mapping(("COFFEE",), Action("key", output=("ESC",))))
+    win.trigger = ("COFFEE",)
+    win._refresh_keyboard()
+    assert win.keyboard.selected == "EJECTCD" and "EJECTCD" in win.keyboard.assignments
+    assert keys.name_to_code("EJECTCD") in win.keyboard.pressed
+    assert "COFFEE" not in win.keyboard.extras

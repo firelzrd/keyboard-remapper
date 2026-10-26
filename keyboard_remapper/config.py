@@ -27,6 +27,12 @@ def legacy_config_path() -> str:
     return os.path.join(base, "remapper", "config.json")
 
 
+def _size(value) -> str:
+    """A saved layout size; sizes dropped since are mapped to the nearest one, unknown ones to "full"."""
+    value = layouts.LEGACY_SIZES.get(value, value)
+    return value if value in layouts.SIZE_IDS else "full"
+
+
 @dataclass
 class DeviceConfig:
     name: str = ""
@@ -46,7 +52,7 @@ class DeviceConfig:
             preset=Preset.from_dict(d.get("preset", {})),
             enabled=bool(d.get("enabled", True)),
             standard=d.get("standard", "ansi") if d.get("standard") in ("ansi", "iso", "jis") else "ansi",
-            size=d.get("size", "full") if d.get("size") in layouts.SIZE_IDS else "full",
+            size=_size(d.get("size", "full")),
         )
 
 

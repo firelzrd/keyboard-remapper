@@ -305,15 +305,17 @@ class KeyboardView(Gtk.DrawingArea):
         y = oy + (ky + GAP) * u + dy
         w = (kw - 2 * GAP) * u
         h = (kh - 2 * GAP) * u
-        self._legends(cr, name, x, y, w, h, u, text, p, accent, assigned, bool(in_layer or pressed))
+        self._legends(cr, name, x, y, w, h, u, text, p, accent, assigned, bool(in_layer or pressed), shape.label)
 
         if name in self.other_layers and not assigned:
             cr.arc(x + w - 0.16 * u, y + 0.16 * u, 0.065 * u, 0, 2 * math.pi)
             cr.set_source_rgba(*accent)
             cr.fill()
 
-    def _legends(self, cr, name, x, y, w, h, u, text, p, accent, assigned, active) -> None:
+    def _legends(self, cr, name, x, y, w, h, u, text, p, accent, assigned, active, label="") -> None:
         top_txt, main_txt = keys.cap_legend(name, self.layout.family, LANG)
+        if label:
+            top_txt, main_txt = "", label
         if assigned:
             # show what it does, big; the original legend becomes the small one
             self._text(cr, main_txt or top_txt, x + 0.1 * u, y + 0.07 * u, w - 0.2 * u, 0.24 * u,

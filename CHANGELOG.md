@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Apple Magic Keyboard layouts measured from real keyboards (14.5 key units wide):
+  with or without numeric keypad; US, ISO and JIS. One layout serves every generation: the top-right key (Eject on the
+  2015 keyboards, Lock on later ones, Touch ID on some) is drawn as one cap that reacts to both KEY_EJECTCD and KEY_COFFEE.
+  The JIS drawing is measured from a photo of the real keyboard: Esc and Tab 1 wide, "1" 1.5 wide (no
+  Hankaku/Zenkaku key), Control above Shift, Caps Lock bottom-left and Fn right of the right Command.
+  The numeric-keypad JIS keyboard is drawn from a photo too (F13-F19, Fn / Home / PageUp, Delete / End / PageDown,
+  inverted-T arrows, Option and Control at the right end of the bottom row).
+  The size (compact / numeric keypad) is picked automatically from the USB/Bluetooth product id, JIS from the keys
+  the keyboard reports.
+  Apple's function row sits flush on the number row (no gap), unlike other keyboards.
+  Layouts of non-Apple keyboards are unchanged.
+
 ## 1.0.0
 
 First stable release.

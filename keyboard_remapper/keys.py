@@ -199,6 +199,7 @@ _CAP_LABELS: dict[str, tuple[str, str]] = {
     "KPMINUS": ("-", "-"), "KPPLUS": ("+", "+"), "KPENTER": ("Enter", "Enter"), "KPDOT": (".", "."),
     "ZENKAKUHANKAKU": ("半/全", "半/全"), "MUHENKAN": ("無変換", "無変換"), "HENKAN": ("変換", "変換"),
     "KATAKANAHIRAGANA": ("かな", "かな"), "FN": ("fn", "fn"), "EJECTCD": ("⏏", "⏏"),
+    "KPEQUAL": ("=", "="), "KPJPCOMMA": (",", ","),
 }
 
 # Apple keycaps: (top, main).  Used for the "apple-*" layout families.
@@ -210,6 +211,8 @@ _APPLE_LEGENDS: dict[str, tuple[str, str]] = {
     "CAPSLOCK": ("", "caps lock"), "TAB": ("", "tab"), "ESC": ("", "esc"),
     "LEFTSHIFT": ("", "shift"), "RIGHTSHIFT": ("", "shift"), "EJECTCD": ("", "⏏"),
     "HANJA": ("", "英数"), "HANGEUL": ("", "かな"),
+    "NUMLOCK": ("", "clear"), "DELETE": ("", "⌦"), "HOME": ("", "home"), "END": ("", "end"),
+    "PAGEUP": ("", "pg up"), "PAGEDOWN": ("", "pg dn"),
 }
 
 
@@ -253,7 +256,9 @@ def cap_legend(spec: str, family: str = "us", lang: str = "ja") -> tuple[str, st
 
 
 # Keys drawn on another key's cap when the layout has no shape of their own.
-DISPLAY_ALIASES: dict[str, str] = {"ZENKAKUHANKAKU": "GRAVE"}
+# (only used where the layout has no cap for the key itself).  COFFEE is the Lock key of newer Apple keyboards,
+# which sits where older ones have Eject.
+DISPLAY_ALIASES: dict[str, str] = {"ZENKAKUHANKAKU": "GRAVE", "COFFEE": "EJECTCD"}
 
 # Notes shown next to keys in the chooser: name -> (english, japanese, is_warning)
 _HINTS: dict[str, tuple[str, str, bool]] = {

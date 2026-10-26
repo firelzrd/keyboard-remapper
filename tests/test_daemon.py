@@ -208,3 +208,12 @@ async def test_output_monitor_shows_what_is_sent(tmp_path):
     assert out == [("ZENKAKUHANKAKU", 1), ("ZENKAKUHANKAKU", 0)]
     c.close()
     await d.stop()
+
+
+@pytest.mark.asyncio
+async def test_device_list_carries_the_layout_hint(tmp_path):
+    nodes = fake_keyboard(0)
+    nodes[0].layout_hint = "jis"
+    b, d = await make(tmp_path, nodes)
+    assert d.device_list()[0]["layout_hint"] == "jis"
+    await d.stop()
