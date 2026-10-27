@@ -98,7 +98,10 @@ UI: **GTK4 + libadwaita** (PyGObject): follows the GNOME look, light/dark, HiDPI
 ```
 1. **Click a key**, or **press it**, to select it. Holding Ctrl (or toggling the on-screen modifier) shows the Ctrl layer.
 2. In the editor choose the action and output (press keys, search a list, or toggle modifiers).
-3. **Autosave and instant apply**; deleting offers Undo. The output is only saved once you pick it.
+3. **Autosave and instant apply**. The output is only saved once you pick it.
+   Undo / Redo in the header keep the whole history of the session, per keyboard (snapshots of the preset).
+   Consecutive changes to one key are one step; a change to another key, a removal, clear all, import or
+   reorder starts a new one. Removals and imports also show a toast with Undo.
 4. The header switch turns remapping on/off for that keyboard.
 
 Also: layout (ANSI/ISO/JIS) remembered per keyboard, guessed from XKB / locale; recording grabs the

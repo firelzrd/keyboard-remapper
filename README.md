@@ -25,9 +25,11 @@ should type**, and review or change the mapping of any key or combination such a
 - "Press to set": record the trigger or the output by pressing real keys. While recording, the daemon
   grabs the keyboard exclusively, so keys the desktop normally eats (Super, Alt+F4 …) are captured reliably.
 - **Mapping list**: drag rows to reorder, or click a column header (Key / Mapped to) to sort ascending → descending → manual order.
-  Right-click a row to remove it instantly (no confirmation; an Undo toast follows), or use the trash button to clear everything.
+  Right-click a row to remove it instantly (no confirmation), or use the trash button to clear everything.
   Mappings can be **exported to / imported from a file** (menu next to the list) to share them or move to another machine.
-- Changes are saved and applied instantly. Deleting can be undone. Light / dark theme, English / Japanese,
+- Changes are saved and applied instantly. **Undo / Redo** (buttons at the top left) go back through every change
+  made since the app was started, per keyboard; consecutive changes to the same key count as one step.
+  Light / dark theme, English / Japanese,
   works in narrow windows.
 
 ## Install

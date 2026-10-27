@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Undo / Redo for every change** (header buttons), unlimited while the app runs, per keyboard. Consecutive
+  changes to the same key are one step; removing, clearing all, importing and reordering are steps of their own.
+  Before, only a deletion could be undone, and only from a 6-second toast.
 - Apple Magic Keyboard layouts measured from real keyboards (14.5 key units wide):
   with or without numeric keypad; US, ISO and JIS. One layout serves every generation: the top-right key (Eject on the
   2015 keyboards, Lock on later ones, Touch ID on some) is drawn as one cap that reacts to both KEY_EJECTCD and KEY_COFFEE.

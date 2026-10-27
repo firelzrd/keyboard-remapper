@@ -152,8 +152,9 @@ def test_delete_with_undo(env):
     win.set_mapping(Mapping(("A",), Action("key", output=("B",))))
     win.delete_mapping()
     assert win.cfg().preset.find(("A",)) is None
-    win._undo_delete(Mapping(("A",), Action("key", output=("B",))))
+    win.undo()
     assert win.cfg().preset.find(("A",)) is not None
+    assert win.trigger == ("A",)                                 # the restored mapping is shown again
 
 
 def test_physical_key_selects_via_daemon_monitor(env):
@@ -429,15 +430,17 @@ def test_rows_are_draggable_and_accept_drops(env):
     assert any(isinstance(c, Gtk.DragSource) for c in ctl) and any(isinstance(c, Gtk.DropTarget) for c in ctl)
 
 
-def test_remove_via_menu_is_immediate_and_undo_merges_batches(env):
+def test_remove_via_menu_is_immediate_and_each_removal_undoes_separately(env):
     win, d, _ = env
     _fill(win, [(("A",), ("B",)), (("C",), ("D",)), (("E",), ("F",))])
     win.remove_mappings([win.cfg().preset.find(("A",))])
     assert win.cfg().preset.find(("A",)) is None                 # no confirmation step
     win.remove_mappings([win.cfg().preset.find(("C",))])
-    assert len(win._deleted) == 2                                # consecutive deletions share one undo
-    win._undo_removed(win._deleted)
+    win.undo()
+    assert win.cfg().preset.find(("C",)) and not win.cfg().preset.find(("A",))
+    win.undo()
     assert win.cfg().preset.find(("A",)) and win.cfg().preset.find(("C",))
+    assert not win.undo_btn.get_sensitive() and win.redo_btn.get_sensitive()
 
 
 def test_clear_all_and_undo(env):
@@ -446,8 +449,76 @@ def test_clear_all_and_undo(env):
     assert win.clear_btn.get_sensitive()
     win.clear_all()
     assert not win.cfg().preset.mappings and not win.clear_btn.get_sensitive()
-    win._undo_removed(win._deleted)
-    assert len(win.cfg().preset.mappings) == 2
+    pump(9)                                                      # long after the toast has gone
+    win.undo()
+    assert [m.trigger for m in win.cfg().preset.mappings] == [("A",), ("C",)]
+    win.redo()
+    assert not win.cfg().preset.mappings
+    win.undo()
+    pump(0.5)
+    assert json.load(open(win.config.path))["devices"][win.model]["preset"]["mappings"]   # saved too
+
+
+def test_undo_redo_history_is_unlimited_and_new_edit_drops_redo(env):
+    win, d, _ = env
+    for i in range(60):                                           # alternate keys: every change is a step
+        win.set_mapping(Mapping(("F1",) if i % 2 else ("F2",), Action("key", output=(f"F{3 + i % 9}",))))
+    for _ in range(60):
+        win.undo()
+    assert not win.cfg().preset.mappings and not win.undo_btn.get_sensitive()
+    for _ in range(60):
+        win.redo()
+    assert win.cfg().preset.find(("F1",)).action.output == ("F8",)   # i = 59
+    win.undo()
+    win.set_mapping(Mapping(("C",), Action("key", output=("D",))))
+    assert not win.redo_btn.get_sensitive()                       # a new edit forgets what was undone
+    win.undo()
+    assert not win.cfg().preset.find(("C",)) and win.cfg().preset.find(("F2",))
+
+
+def test_changes_to_one_key_are_one_undo_step_until_another_key_changes(env):
+    win, d, _ = env
+    win.on_key_clicked("A")
+    for out in (("LEFTCTRL",), ("LEFTCTRL", "B"), ("LEFTCTRL", "C")):  # picking an output key by key
+        win.set_mapping(Mapping(("A",), Action("key", output=out)), rebuild=False)
+    win.set_mapping(Mapping(("A",), Action("disable")))           # changing the kind too
+    win.on_key_clicked("Q")                                       # only looking at another key: still one step
+    win.set_mapping(Mapping(("A",), Action("key", output=("Z",))))
+    win.set_mapping(Mapping(("B",), Action("key", output=("Y",))))
+    win.set_mapping(Mapping(("A",), Action("key", output=("X",))))
+    win.undo()
+    assert win.cfg().preset.find(("A",)).action.output == ("Z",)
+    win.undo()
+    assert win.cfg().preset.find(("B",)) is None
+    win.undo()
+    assert win.cfg().preset.find(("A",)) is None and not win.undo_btn.get_sensitive()
+
+
+def test_removal_is_its_own_undo_step(env):
+    win, d, _ = env
+    win.on_key_clicked("A")
+    win.set_mapping(Mapping(("A",), Action("key", output=("B",))))
+    win.delete_mapping()
+    win.set_mapping(Mapping(("A",), Action("key", output=("C",))))
+    win.undo()
+    assert win.cfg().preset.find(("A",)) is None
+    win.undo()
+    assert win.cfg().preset.find(("A",)).action.output == ("B",)
+
+
+def test_undo_reorder_and_import(env, tmp_path):
+    win, d, _ = env
+    _fill(win, [(("A",), ("B",)), (("C",), ("D",))])
+    win._set_sort("manual")
+    win.move_mapping(1, 0, False)
+    assert _order(win) == [("C",), ("A",)]
+    win.undo()
+    assert _order(win) == [("A",), ("C",)]
+    f = tmp_path / "in.json"
+    f.write_text(json.dumps({"mappings": [{"trigger": ["X"], "action": {"type": "key", "output": ["Y"]}}]}))
+    assert win.import_from(str(f), "replace")
+    win.undo()
+    assert _order(win) == [("A",), ("C",)]
 
 
 def test_right_click_menu_exists_on_rows(env):

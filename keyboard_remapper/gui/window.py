@@ -58,10 +58,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.link.on_key.append(self._on_daemon_key)
         self.link.on_capture_ended.append(lambda m: self.recorder.cancel(notify=True))
 
-        self._deleted: list[Mapping] = []          # batch the "Undo" toast would restore
-        self._undo_toast = None
         self._shown: list[Mapping] = []            # mappings in the order the sidebar shows them
-        self._deleted: list[Mapping] = []          # what the current "Undo" toast would restore
+        # per keyboard: (undo, redo) stacks of (preset, selected trigger), kept while the app runs
+        self._history: dict[str, tuple[list, list]] = {}
+        self._merge_key = None                     # consecutive edits with the same key make one undo step
         self._undo_toast = None
         self._build()
         self._on_connection(self.link.connected)
@@ -87,6 +87,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.dev_drop.set_tooltip_text(T("設定するキーボード", "Keyboard to configure"))
         self.dev_drop.connect("notify::selected", self._on_dev_selected)
         header.set_title_widget(self.dev_drop)
+
+        hist = Gtk.Box()
+        hist.add_css_class("linked")
+        self.undo_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        self.undo_btn.set_tooltip_text(T("元に戻す", "Undo"))
+        self.undo_btn.connect("clicked", lambda *_: self.undo())
+        self.redo_btn = Gtk.Button(icon_name="edit-redo-symbolic")
+        self.redo_btn.set_tooltip_text(T("やり直す", "Redo"))
+        self.redo_btn.connect("clicked", lambda *_: self.redo())
+        hist.append(self.undo_btn)
+        hist.append(self.redo_btn)
+        header.pack_start(hist)
+        self._update_history_buttons()
 
         self.sidebar_btn = Gtk.ToggleButton(icon_name="sidebar-show-right-symbolic")
         self.sidebar_btn.set_tooltip_text(T("割り当て一覧", "Mappings"))
@@ -661,6 +674,7 @@ class MainWindow(Adw.ApplicationWindow):
         dst_item = self._shown[dst]
         pos = shown.index(dst_item) + (1 if after else 0)
         shown.insert(pos, item)
+        self._record()
         self.cfg().preset.mappings = shown
         self._set_sort("manual")
         self._save_soon()
@@ -684,43 +698,86 @@ class MainWindow(Adw.ApplicationWindow):
         pop.popup()
 
     def remove_mappings(self, ms: list[Mapping]) -> None:
-        """Delete without asking; the toast offers Undo (and merges consecutive deletions)."""
+        """Delete without asking; Undo (header button or the toast) brings them back."""
         preset = self.cfg().preset
-        removed = [r for m in ms if (r := preset.remove(m.trigger)) is not None]
-        if not removed:
+        if not any(preset.find(m.trigger) is not None for m in ms):
             return
+        step = self._record()
+        removed = [r for m in ms if (r := preset.remove(m.trigger)) is not None]
         self._after_edit(True)
-        self._announce_removed(removed)
+        n = len(removed)
+        self._undo_toast_for(step, T(f"{n} 件の割り当てを削除しました", f"Removed {n} mapping" + ("s" if n > 1 else "")))
 
     def clear_all(self) -> None:
         if self.model:
             self.remove_mappings(list(self.cfg().preset.mappings))
 
-    def _announce_removed(self, removed: list[Mapping]) -> None:
-        batch = (self._deleted if self._undo_toast is not None else []) + removed
-        old = self._undo_toast
-        n = len(batch)
-        toast = Adw.Toast.new(T(f"{n} 件の割り当てを削除しました", f"Removed {n} mapping" + ("s" if n > 1 else "")))
+    # ---- undo / redo
+
+    def _stacks(self) -> tuple[list, list]:
+        return self._history.setdefault(self.model, ([], []))
+
+    def _record(self, merge_key=None):
+        """Call before changing the mappings: remembers the current state as one undo step.
+
+        Returns that step (for an "Undo" toast).  A change with the same *merge_key* as the previous
+        one (another change to the same key) joins the previous step; None always starts a new one."""
+        undo, redo = self._stacks()
+        if merge_key is not None and merge_key == self._merge_key and undo and not redo:
+            return undo[-1]
+        self._merge_key = merge_key
+        step = (self.cfg().preset.copy(), self.trigger)
+        undo.append(step)
+        redo.clear()
+        self._dismiss_undo_toast()
+        self._update_history_buttons()
+        return step
+
+    def undo(self) -> None:
+        if self.model:
+            self._travel(*self._stacks())
+
+    def redo(self) -> None:
+        if self.model:
+            self._travel(*reversed(self._stacks()))
+
+    def _travel(self, src: list, dst: list) -> None:
+        if not src:
+            return
+        dst.append((self.cfg().preset.copy(), self.trigger))
+        preset, trigger = src.pop()
+        self.cfg().preset.mappings = list(preset.mappings)
+        self._merge_key = None
+        self._dismiss_undo_toast()
+        self.trigger = trigger
+        self.sticky = {g for g in (_generic_of_name(n) for n in trigger[:-1]) if g}
+        self._after_edit(True)
+
+    def _update_history_buttons(self) -> None:
+        undo, redo = self._history.get(self.model, ([], []))
+        self.undo_btn.set_sensitive(bool(undo))
+        self.redo_btn.set_sensitive(bool(redo))
+
+    def _undo_toast_for(self, step, text: str) -> None:
+        """A toast whose button undoes *step*, as long as it is still the latest one."""
+        toast = Adw.Toast.new(text)
         toast.set_button_label(T("元に戻す", "Undo"))
-        toast.set_timeout(6)
-        toast.connect("button-clicked", lambda *_: self._undo_removed(batch))
-        toast.connect("dismissed", self._toast_dismissed)
-        self._deleted, self._undo_toast = batch, toast
-        if old is not None:
-            old.dismiss()                    # its "dismissed" is ignored: it is no longer the current toast
+        toast.set_timeout(8)
+        model = self.model
+
+        def clicked(*_):
+            undo = self._history.get(model, ([], []))[0]
+            if model == self.model and undo and undo[-1] is step:
+                self.undo()
+
+        toast.connect("button-clicked", clicked)
+        self._undo_toast = toast
         self.toasts.add_toast(toast)
 
-    def _toast_dismissed(self, toast) -> None:
-        if toast is self._undo_toast:
+    def _dismiss_undo_toast(self) -> None:
+        if self._undo_toast is not None:
+            self._undo_toast.dismiss()
             self._undo_toast = None
-            self._deleted = []
-
-    def _undo_removed(self, batch: list[Mapping]) -> None:
-        if not self.model:
-            return
-        for m in batch:
-            self.cfg().preset.set(m)
-        self._after_edit(True)
 
     # ---- export / import
 
@@ -785,7 +842,7 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _apply_import(self, imported: Preset, mode: str, skipped: int) -> None:
-        before = self.cfg().preset.copy()
+        step = self._record()
         if mode == "replace":
             self.cfg().preset.mappings = list(imported.mappings)
         else:
@@ -797,17 +854,7 @@ class MainWindow(Adw.ApplicationWindow):
         msg = T(f"{n} 件の割り当てを読み込みました", f"Imported {n} mappings")
         if skipped:
             msg += T(f" ({skipped} 件は無効なため除外)", f" ({skipped} skipped as invalid)")
-        toast = Adw.Toast.new(msg)
-        toast.set_button_label(T("元に戻す", "Undo"))
-        toast.set_timeout(8)
-
-        def undo(*_):
-            self.cfg().preset.mappings = list(before.mappings)
-            self.trigger = ()
-            self._after_edit(True)
-
-        toast.connect("button-clicked", undo)
-        self.toasts.add_toast(toast)
+        self._undo_toast_for(step, msg)
 
     def _filter_row(self, row) -> bool:
         q = self.search.get_text().strip().lower()
@@ -838,6 +885,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_status()
 
     def _update_status(self) -> None:
+        self._update_history_buttons()
         d = next((x for x in self.devs if x["model"] == self.model), None)
         pill = self.status_pill
         for c in ("on", "off"):
@@ -893,6 +941,8 @@ class MainWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------ editing
 
     def set_mapping(self, mapping: Mapping, rebuild: bool = True) -> None:
+        # consecutive changes to the same key are one undo step, until another key or the whole list changes
+        self._record(("edit", self.model, mapping.trigger_id()))
         self.cfg().preset.set(mapping)
         self.trigger = mapping.trigger
         self._after_edit(rebuild)
@@ -914,9 +964,6 @@ class MainWindow(Adw.ApplicationWindow):
         m = self.cfg().preset.find(self.trigger) if self.trigger else None
         if m is not None:
             self.remove_mappings([m])
-
-    def _undo_delete(self, m: Mapping) -> None:
-        self._undo_removed([m])
 
     def _on_enable_toggled(self, *_) -> None:
         if self._updating or not self.model:
