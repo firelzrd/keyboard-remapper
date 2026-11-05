@@ -13,11 +13,21 @@ from .ipc import Client
 from .mapping import MappingError, Preset
 
 
+DENIED_HINT = ("keyboard-remapperd only accepts root and the user of the active local login session\n"
+               "  (not SSH / remote desktop / a session switched to the background); try with sudo")
+
+
 def _connect(path: str) -> Client:
     c = Client(path)
     if not c.connect():
         print(f"cannot connect to {path} - is keyboard-remapperd running?\n"
               "  sudo systemctl enable --now keyboard-remapperd", file=sys.stderr)
+        sys.exit(2)
+    if not c.request("hello").get("ok"):
+        if c.denied:
+            print(f"keyboard-remapperd refused the connection: {DENIED_HINT}", file=sys.stderr)
+        else:
+            print(f"keyboard-remapperd at {path} does not answer", file=sys.stderr)
         sys.exit(2)
     return c
 
@@ -96,15 +106,23 @@ def cmd_doctor(c: Client | None, args) -> int:
         print(f"[{'ok' if good else 'NG'}] {label}" + ("" if good else f"  -> {hint}"))
 
     check("/dev/uinput exists", os.path.exists("/dev/uinput"), "sudo modprobe uinput")
-    check("/dev/input readable by root", os.access("/dev/input", os.R_OK))
+    check("/dev/input exists", os.path.isdir("/dev/input"), "no input devices on this system")
     cl = Client(args.socket)
     reachable = cl.connect()
     check("daemon socket reachable", reachable, "sudo systemctl enable --now keyboard-remapperd")
     if reachable:
         info = cl.request("hello")
-        theirs = info.get("version", "?")
-        check(f"daemon version {theirs} matches this tool ({__version__})", theirs == __version__,
-              "sudo systemctl restart keyboard-remapperd")
+        check("daemon accepts this user", info.get("ok", False) or not cl.denied, DENIED_HINT)
+        if info.get("ok"):
+            theirs = info.get("version", "?")
+            check(f"daemon version {theirs} matches this tool ({__version__})", theirs == __version__,
+                  "sudo systemctl restart keyboard-remapperd")
+            devs = info.get("devices", [])
+            check(f"keyboards detected: {len(devs)}", bool(devs),
+                  "none found - is a keyboard connected? `sudo evtest` lists the input devices")
+            for d in devs:
+                state = "active" if d.get("applied") else ("configured" if d.get("configured") else "-")
+                print(f"       {d['model']}  {state:<10}  {d['name']}")
     return 0 if ok else 1
 
 

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Keyboards whose main node also reports a volume / vendor axis (`ABS_VOLUME`, `ABS_MISC`, …) are no
+  longer skipped; pointers (mice, touchpads, scroll wheels) still are never grabbed.
+- Hotplug: a re-used `/dev/input/eventN` (unplug one device, plug another) is probed again instead of
+  being taken for the old device, and a node that could not be opened right after plugging is retried.
+- The GUI and `keyboard-remapper-ctl` say when the service refuses the session (SSH, remote desktop,
+  a user switched to the background) instead of "the service is not running", and the window no longer
+  flickers between connected and disconnected in that case.
+- `keyboard-remapper-ctl doctor` lists the keyboards the service sees and checks that it accepts you.
+- The service drops a client that stops reading (e.g. `monitor` piped into a paused pager) instead of
+  buffering every key press; timers of finished key sequences are no longer kept for the daemon's lifetime.
 - **Undo / Redo for every change** (header buttons), unlimited while the app runs, per keyboard. Consecutive
   changes to the same key are one step; removing, clearing all, importing and reordering are steps of their own.
   Before, only a deletion could be undone, and only from a 6-second toast.

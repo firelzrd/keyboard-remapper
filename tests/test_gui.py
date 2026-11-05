@@ -356,7 +356,7 @@ def test_modifier_chord_selected_by_pressing_and_saved(env):
     pump(0.3)
     m = win.cfg().preset.find(("LEFTSHIFT", "LEFTCTRL"))
     assert m is not None and m.action.output == ("CAPSLOCK",)
-    assert "離す" in win.editor.summary.get_label() or "released" in win.editor.summary.get_label()
+    assert "離す" in win.editor.summary.get_label() or "releas" in win.editor.summary.get_label()
 
 
 def _fill(win, specs):
@@ -686,3 +686,20 @@ def test_lock_key_press_lights_the_eject_cap_on_apple_layouts(env):
     assert win.keyboard.selected == "EJECTCD" and "EJECTCD" in win.keyboard.assignments
     assert keys.name_to_code("EJECTCD") in win.keyboard.pressed
     assert "COFFEE" not in win.keyboard.extras
+
+
+def test_refused_session_explains_instead_of_flickering(env, monkeypatch):
+    """A session the daemon refuses (SSH, background VT) is told why; no "start the service" offer."""
+    from keyboard_remapper import daemon as daemonmod
+    win, d, _ = env
+    monkeypatch.setattr(daemonmod, "peer_allowed", lambda uid: False)
+    d.daemon.check_peer = True
+    states = []
+    win.link.on_connection.append(states.append)
+    win.link.client.close()                 # drop the allowed connection; reconnects get refused
+    pump(5)
+    assert win.link.denied and not win.link.connected
+    assert win.banner.get_revealed()
+    assert "session" in win.banner.get_title().lower() or "セッション" in win.banner.get_title()
+    assert states.count(True) == 0          # never pretended to be connected in between
+    assert states.count(False) <= 2

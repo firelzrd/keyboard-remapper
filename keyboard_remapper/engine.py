@@ -347,8 +347,16 @@ class Engine:
             if kind == "wait":
                 if self.scheduler is None or arg <= 0:
                     continue
-                self._timers.append(self.scheduler.call_later(
-                    arg, lambda i=i: self._step(steps, i, gen, serial)))
+                box: list[object] = []
+
+                def resume(i=i, box=box) -> None:
+                    # forget the fired timer, or a long-running daemon would keep every one
+                    if box and box[0] in self._timers:
+                        self._timers.remove(box[0])
+                    self._step(steps, i, gen, serial)
+
+                box.append(self.scheduler.call_later(arg, resume))
+                self._timers.append(box[0])
                 return
             self._tap(arg, serial, i)
 

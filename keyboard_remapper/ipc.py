@@ -25,6 +25,7 @@ class Client:
         self._pending: dict[int, Callable[[dict], None]] = {}
         self._lock = threading.Lock()
         self.connected = False
+        self.denied = False         # the daemon refused this user (no active local session)
 
     def connect(self) -> bool:
         if self.connected:
@@ -75,7 +76,10 @@ class Client:
                 self.on_state(False)
 
     def _dispatch(self, msg: dict) -> None:
+        if msg.get("event") == "denied":
+            self.denied = True
         if "id" in msg:
+            self.denied = False     # the daemon answers: we are allowed (again)
             with self._lock:
                 cb = self._pending.pop(msg["id"], None)
             if cb:

@@ -20,6 +20,7 @@ class DaemonLink:
     def __init__(self, socket_path: str):
         self.client = Client(socket_path, on_event=_ui(self._event), on_state=_ui(self._state))
         self.connected = False
+        self.denied = False        # the daemon refuses this session (not an active local login)
         self.devices: list[dict] = []
         self.on_connection: list[Callable[[bool], None]] = []
         self.version: str | None = None            # version the daemon reports
@@ -36,22 +37,33 @@ class DaemonLink:
         return True
 
     def _state(self, ok: bool) -> None:
-        self.connected = ok
         if ok:
+            # connected only once the daemon answers: a refused peer is hung up on right away,
+            # and flipping to "connected" for that moment would make the window flicker
             self.client.request_async("hello", _ui(self._hello))
-        else:
-            self.devices = []
-        for cb in list(self.on_connection):
-            cb(ok)
+            return
+        denied = self.client.denied
+        changed = self.connected or denied != self.denied
+        self.connected = False
+        self.denied = denied
+        self.devices = []
+        if changed:
+            for cb in list(self.on_connection):
+                cb(False)
 
     def _hello(self, msg: dict) -> None:
-        if msg.get("ok"):
-            self.version = msg.get("version")
-            for cb in list(self.on_hello):
-                cb(self.version)
-            self.devices = msg.get("devices", [])
-            for cb in list(self.on_devices):
-                cb(self.devices)
+        if not msg.get("ok"):
+            return
+        self.connected = True
+        self.denied = False
+        for cb in list(self.on_connection):
+            cb(True)
+        self.version = msg.get("version")
+        for cb in list(self.on_hello):
+            cb(self.version)
+        self.devices = msg.get("devices", [])
+        for cb in list(self.on_devices):
+            cb(self.devices)
 
     def _event(self, msg: dict) -> None:
         ev = msg.get("event")

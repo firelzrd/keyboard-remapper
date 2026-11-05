@@ -34,6 +34,9 @@ CAPTURE_TIMEOUT_S = 25.0
 RESCAN_INTERVAL_S = 1.0
 GRAB_RETRY_S = 0.03
 GRAB_GIVE_UP_S = 3.0
+# A client that stops reading (e.g. "monitor" piped into a paused pager) is dropped once this much
+# output is queued for it, instead of letting the daemon buffer every key press in memory.
+CLIENT_MAX_BACKLOG = 4 * 1024 * 1024
 
 
 class LoopScheduler:
@@ -90,9 +93,14 @@ class Client:
         self.capture_models: set[str] = set()
 
     def send(self, msg: dict) -> None:
+        if self.writer.is_closing():
+            return
         try:
             self.writer.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
-        except (ConnectionError, RuntimeError):
+            if self.writer.transport.get_write_buffer_size() > CLIENT_MAX_BACKLOG:
+                log.warning("dropping a client that stopped reading")
+                self.writer.transport.abort()
+        except (ConnectionError, RuntimeError, AttributeError):
             pass
 
 
@@ -338,6 +346,13 @@ class Daemon:
             except OSError:
                 uid = -1
             if not peer_allowed(uid):
+                # say why before hanging up, so the GUI / CLI can tell the user (instead of
+                # "the service is not running")
+                try:
+                    writer.write(b'{"event": "denied", "reason": "session"}\n')
+                    await writer.drain()
+                except (ConnectionError, RuntimeError):
+                    pass
                 writer.close()
                 return
         c = Client(writer)

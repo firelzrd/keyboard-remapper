@@ -128,8 +128,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.pack_end(sw_box)
         view.append(header)
 
-        self.banner = make_banner(T("バックグラウンドサービス (keyboard-remapperd) に接続できません",
-                                    "Cannot reach the background service (keyboard-remapperd)"))
+        self.banner = make_banner(T(*self._BANNER_OFFLINE))
         self.banner.set_button_label(T("起動する", "Start"))
         self.banner.connect("button-clicked", self._start_service)
         view.append(self.banner)
@@ -343,7 +342,16 @@ class MainWindow(Adw.ApplicationWindow):
         toast.connect("button-clicked", lambda *_: self._start_service(verb="restart"))
         self.toasts.add_toast(toast)
 
+    _BANNER_OFFLINE = ("バックグラウンドサービス (keyboard-remapperd) に接続できません",
+                       "Cannot reach the background service (keyboard-remapperd)")
+    _BANNER_DENIED = ("このセッションからはサービスを使えません (ローカルでログイン中の画面からのみ使えます)",
+                      "This session may not use the service (only an active local login can)")
+
     def _on_connection(self, ok: bool) -> None:
+        denied = not ok and self.link.denied
+        self.banner.set_title(T(*(self._BANNER_DENIED if denied else self._BANNER_OFFLINE)))
+        # starting the service does not help a refused session
+        self.banner.set_button_label("" if denied else T("起動する", "Start"))
         self.banner.set_revealed(not ok)
         if ok:
             self._pushed.clear()
@@ -407,6 +415,14 @@ class MainWindow(Adw.ApplicationWindow):
         if self.link.connected:
             self.empty.set_title(T("キーボードが見つかりません", "No keyboard found"))
             self.empty.set_description(T("キーボードを接続すると、ここに表示されます。", "Connect a keyboard and it will appear here."))
+            self.empty_btn.set_visible(False)
+        elif self.link.denied:
+            self.empty.set_title(T("このセッションからは使えません", "Not available in this session"))
+            self.empty.set_description(T(
+                "keyboard-remapperd は、このコンピューターの前でログインしている (アクティブな) ユーザーだけに"
+                "キー入力を見せます。リモート接続や、切り替えて裏に回ったセッションからは使えません。",
+                "keyboard-remapperd only talks to the user logged in at this computer (the active local session).\n"
+                "Remote sessions and sessions switched to the background cannot use it."))
             self.empty_btn.set_visible(False)
         else:
             self.empty.set_title(T("サービスが起動していません", "The service is not running"))

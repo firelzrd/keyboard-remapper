@@ -72,6 +72,30 @@ class Backend:
 
 _LEDS = [e.LED_NUML, e.LED_CAPSL, e.LED_SCROLLL]
 
+# Axes some keyboards report next to their keys (a volume value or vendor data from a combined HID
+# descriptor).  The virtual keyboard cannot pass them on, but they carry nothing a user relies on,
+# so a keyboard reporting them is still a keyboard.  Anything else (X/Y, wheels, touch) is a pointer.
+HARMLESS_REL = {e.REL_MISC, e.REL_DIAL}
+HARMLESS_ABS = {e.ABS_VOLUME, e.ABS_MISC}
+_CONSUMER_KEYS = {e.KEY_VOLUMEUP, e.KEY_PLAYPAUSE, e.KEY_MUTE, e.KEY_POWER, e.KEY_SLEEP,
+                  e.KEY_BRIGHTNESSUP, e.KEY_F1, e.KEY_LEFTCTRL}
+
+
+def classify(ks: set[int], rel: set[int], abs_: set[int]) -> bool | None:
+    """True: a keyboard node.  False: its consumer-control (media keys) sibling.  None: skip it."""
+    kbd = {c for c in ks if c < 0x100 or c >= 0x160}      # below BTN_MISC or above the BTN_ ranges
+    if not kbd:
+        return None
+    is_main = {e.KEY_A, e.KEY_Z, e.KEY_ENTER, e.KEY_SPACE} <= ks
+    if rel or abs_:
+        # Never grab a pointer: its movement would be lost.  A media-key node with an axis keeps
+        # working ungrabbed; only a real keyboard is worth taking over despite a harmless axis.
+        if not is_main or not rel <= HARMLESS_REL or not abs_ <= HARMLESS_ABS:
+            return None
+    if not is_main and not ks & _CONSUMER_KEYS:
+        return None
+    return is_main
+
 
 class EvdevInput(InputHandle):
     def __init__(self, path: str):
@@ -172,10 +196,20 @@ class EvdevOutput(OutputDevice):
 
 class EvdevBackend(Backend):
     def __init__(self):
-        self._cache: dict[str, NodeInfo | None] = {}
+        # path -> (node identity, probe result).  The kernel hands a freed eventN to the next
+        # device that appears, so a path alone does not say which device is behind it.
+        self._cache: dict[str, tuple[tuple, NodeInfo | None]] = {}
 
     def create_output(self) -> OutputDevice:
         return EvdevOutput()
+
+    @staticmethod
+    def _identity(path: str) -> tuple | None:
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return (st.st_rdev, st.st_ino, st.st_ctime_ns)
 
     def scan(self) -> list[NodeInfo]:
         import evdev
@@ -183,12 +217,22 @@ class EvdevBackend(Backend):
             names = [n for n in os.listdir("/dev/input") if n.startswith("event")]
         except OSError:
             names = []
-        paths = {f"/dev/input/{n}" for n in names}
-        for gone in set(self._cache) - paths:
-            del self._cache[gone]
-        for path in sorted(paths - set(self._cache)):
-            self._cache[path] = self._probe(evdev, path)
-        return [i for i in self._cache.values() if i is not None]
+        current = {}
+        for n in sorted(names):
+            path = f"/dev/input/{n}"
+            ident = self._identity(path)
+            if ident is not None:
+                current[path] = ident
+        for path in list(self._cache):
+            if current.get(path) != self._cache[path][0]:
+                del self._cache[path]
+        for path, ident in current.items():
+            if path not in self._cache:
+                try:
+                    self._cache[path] = (ident, self._probe(evdev, path))
+                except OSError:
+                    pass          # not ready yet (just plugged in) or gone again: retry next scan
+        return [i for _, i in self._cache.values() if i is not None]
 
     @staticmethod
     def _probe(evdev, path: str) -> NodeInfo | None:
@@ -196,22 +240,17 @@ class EvdevBackend(Backend):
             dev = evdev.InputDevice(path)
         except OSError as ex:
             if ex.errno in (errno.ENOENT, errno.ENODEV):
-                return None
-            return None
+                return None       # gone already
+            raise
         try:
             caps = dev.capabilities()
+            if dev.name == VIRTUAL_NAME:
+                return None
             ks = set(caps.get(e.EV_KEY, []))
-            if dev.name == VIRTUAL_NAME or not ks:
-                return None
-            if e.EV_REL in caps or e.EV_ABS in caps:
-                return None
-            kbd = {c for c in ks if c < 0x100 or c >= 0x160}
-            if not kbd:
-                return None
-            is_main = {e.KEY_A, e.KEY_Z, e.KEY_ENTER, e.KEY_SPACE} <= ks
-            if not is_main and not (ks & {e.KEY_VOLUMEUP, e.KEY_PLAYPAUSE, e.KEY_MUTE,
-                                          e.KEY_POWER, e.KEY_SLEEP, e.KEY_BRIGHTNESSUP,
-                                          e.KEY_F1, e.KEY_LEFTCTRL}):
+            rel = set(caps.get(e.EV_REL, []))
+            abs_ = {a[0] if isinstance(a, tuple) else a for a in caps.get(e.EV_ABS, [])}
+            is_main = classify(ks, rel, abs_)
+            if is_main is None:
                 return None
             return NodeInfo(path, dev.name, dev.phys or "", dev.info.vendor, dev.info.product,
                             dev.info.bustype, is_main, dev.uniq or "",

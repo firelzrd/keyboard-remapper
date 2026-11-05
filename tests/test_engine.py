@@ -257,3 +257,14 @@ def test_disabled_ctrl_still_works_as_trigger_modifier():
     assert r.take() == [("ZENKAKUHANKAKU", 0)]
     r.down("LEFTCTRL", "C")                                 # other Ctrl combos: Ctrl is gone
     assert r.take() == [("C", 1)]
+
+
+def test_fired_sequence_timers_are_forgotten():
+    """A daemon runs for weeks: timers of finished sequences must not pile up."""
+    r = Rig((("F13",), ["A", "wait 10", "B", "wait 10", "C"]))
+    for _ in range(50):
+        r.tap("F13")
+        r.sched.advance(10)
+        r.sched.advance(10)
+    assert r.engine._timers == []
+    assert not r.out.pressed

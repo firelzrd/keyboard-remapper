@@ -57,6 +57,13 @@ class LegacyBanner(Gtk.Revealer):
 
     def set_button_label(self, label: str) -> None:
         self._button.set_label(label)
+        self._button.set_visible(bool(label))      # like Adw.Banner: no label, no button
+
+    def set_title(self, title: str) -> None:
+        self._label.set_label(title)
+
+    def get_title(self) -> str:
+        return self._label.get_label()
 
     def set_revealed(self, on: bool) -> None:
         self.set_reveal_child(on)

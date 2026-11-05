@@ -217,3 +217,50 @@ async def test_device_list_carries_the_layout_hint(tmp_path):
     b, d = await make(tmp_path, nodes)
     assert d.device_list()[0]["layout_hint"] == "jis"
     await d.stop()
+
+
+@pytest.mark.asyncio
+async def test_client_that_stops_reading_is_dropped(tmp_path, monkeypatch):
+    """`keyboard-remapper-ctl monitor | less` paused: the daemon must not buffer key presses forever."""
+    import json
+    import socket as socketmod
+    from keyboard_remapper import daemon as daemonmod
+    monkeypatch.setattr(daemonmod, "CLIENT_MAX_BACKLOG", 64 * 1024)
+    b, d = await make(tmp_path)
+    s = socketmod.socket(socketmod.AF_UNIX, socketmod.SOCK_STREAM)
+    s.setsockopt(socketmod.SOL_SOCKET, socketmod.SO_RCVBUF, 4096)
+    s.connect(str(tmp_path / "s.sock"))
+    s.sendall((json.dumps({"id": 1, "cmd": "monitor", "on": True}) + "\n").encode())
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if any(c.monitor for c in d.clients):
+            break
+    h = b.inputs["/dev/input/fake0a"]
+    for _ in range(20000):
+        h.inject(code("A"), 1)
+        h.inject(code("A"), 0)
+        if not d.clients:
+            break
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if not d.clients:
+            break
+    assert not d.clients                     # dropped, not buffered
+    s.close()
+    await d.stop()
+
+
+@pytest.mark.asyncio
+async def test_refused_peer_is_told_why(tmp_path, monkeypatch):
+    """An SSH / background session gets a reason, not just a closed socket."""
+    from keyboard_remapper import daemon as daemonmod
+    monkeypatch.setattr(daemonmod, "peer_allowed", lambda uid: False)
+    b, d = await make(tmp_path)
+    d.check_peer = True
+    c = Client(str(tmp_path / "s.sock"))
+    assert c.connect()
+    r = await call(c, "hello")
+    assert not r["ok"]
+    assert c.denied
+    c.close()
+    await d.stop()
