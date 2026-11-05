@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Layer keys**: a normal key held in a trigger (`Muhenkan + H → ←`, `Space + J → ↓`, `CapsLock + H`) no
+  longer types itself every time it is used as a layer (Muhenkan reached the input method, Space typed a
+  space). It types only when tapped alone; the editor says so.
 - Keyboards whose main node also reports a volume / vendor axis (`ABS_VOLUME`, `ABS_MISC`, …) are no
   longer skipped; pointers (mice, touchpads, scroll wheels) still are never grabbed.
 - Hotplug: a re-used `/dev/input/eventN` (unplug one device, plug another) is probed again instead of

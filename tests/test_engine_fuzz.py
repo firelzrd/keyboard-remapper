@@ -21,11 +21,14 @@ MAPS = [
     (("F13",), ["Ctrl+C", "wait 30", "Ctrl+V"]),
     (("LEFTSHIFT", "LEFTCTRL"), ("CAPSLOCK",)),
     (("CTRL", "ALT"), ("F14",)),
+    (("MUHENKAN", "K"), ("UP",)),          # layer keys (deferred until used or released)
+    (("CAPSLOCK", "A"), ("HOME",)),
+    (("SPACE", "CTRL", "B"), ["A", "wait 10", "B"]),
 ]
 
 
 def test_fuzz_outputs_stay_balanced():
-    for seed in range(300):
+    for seed in range(1500):
         rnd = random.Random(seed)
         r = Rig(*rnd.sample(MAPS, rnd.randint(0, len(MAPS))))
         down = set()

@@ -114,7 +114,7 @@ class _Held:
     __slots__ = ("kind", "owner")
 
     def __init__(self, kind: str, owner: Hashable):
-        self.kind = kind          # "pass" | "map" | "swallow" | "seq"
+        self.kind = kind          # "pass" | "map" | "swallow" | "seq" | "pending" | "layer"
         self.owner = owner
 
 
@@ -128,6 +128,7 @@ class Engine:
         self.held: dict[int, _Held] = {}
         self._chords: list[_Chord] = []
         self._alias_mods: set[int] = set()   # keys remapped to a single modifier (count as modifiers)
+        self._layer_keys: set[int] = set()   # non-modifier keys held in some trigger (Muhenkan + H)
         self._session_dirty = False          # a non-modifier key was used since the first key went down
         self._session_keys: set[int] = set()  # every key pressed since the first one went down
         self._timers: list[object] = []
@@ -142,6 +143,7 @@ class Engine:
         self._by_key = {}
         self._chords = []
         self._alias_mods = set()
+        self._layer_keys = set()
         for m in self.preset.mappings:
             if is_chord_tap(m.trigger):
                 self._chords.append(_Chord(m))
@@ -149,10 +151,13 @@ class Engine:
             c = _Compiled(m)
             for code in c.key_codes:
                 self._by_key.setdefault(code, []).append(c)
+            for spec in c.held:
+                self._layer_keys.update(k for k in spec if not keys.is_modifier(k))
             a = m.action
             if (not m.held and a.type == ACTION_KEY and len(a.output_codes()) == 1
                     and keys.is_modifier(a.output_codes()[0])):
                 self._alias_mods.update(c.key_codes)
+        self._layer_keys -= self._alias_mods      # CapsLock -> Ctrl stays an immediate Ctrl
 
     # -- event entry points ----------------------------------------------
 
@@ -211,13 +216,8 @@ class Engine:
     def _modlike(self, code: int) -> bool:
         return keys.is_modifier(code) or code in self._alias_mods
 
-    def _press(self, code: int) -> None:
-        if not self.held:
-            self._session_dirty = False
-            self._session_keys = set()
-        self._session_keys.add(code)
-        if not self._modlike(code):
-            self._session_dirty = True
+    def _best(self, code: int) -> tuple[_Compiled, list[int]] | None:
+        """The mapping a press of *code* fires now, with the held physical keys it uses."""
         cand = self._candidates(code)
         down = list(cand)
         best: tuple[_Compiled, list[int]] | None = None
@@ -227,7 +227,50 @@ class Engine:
                 continue
             if best is None or c.score > best[0].score:
                 best = (c, [cand[u] for u in dict.fromkeys(used)])
+        return best
 
+    def _pending(self) -> list[int]:
+        return [k for k, h in self.held.items() if h.kind == "pending"]
+
+    def _flush_pending(self) -> None:
+        """Held layer keys that were not used as a layer after all: they type themselves now."""
+        for k in self._pending():
+            del self.held[k]
+            self._resolve(k, self._best(k))
+
+    def _press(self, code: int) -> None:
+        """Layer keys (a non-modifier held in some trigger, e.g. Muhenkan in ``Muhenkan + H``) wait.
+
+        Pressed alone and released, a layer key types itself.  Used as a layer (a key it forms a
+        trigger with is pressed meanwhile) it types nothing.  Pressing any other non-modifier key
+        while it waits makes it type itself first, so rolled typing keeps its order.
+        """
+        if not self.held:
+            self._session_dirty = False
+            self._session_keys = set()
+        self._session_keys.add(code)
+        if not self._modlike(code):
+            self._session_dirty = True
+        best = self._best(code)
+        pending = self._pending()
+        if pending:
+            used = set(best[1]) if best else set()
+            if used & set(pending):
+                for k in pending:
+                    if k in used:
+                        self.held[k].kind = "layer"
+                if any(k not in used for k in pending):
+                    self._flush_pending()
+                    best = self._best(code)
+            elif not self._modlike(code):
+                self._flush_pending()
+                best = self._best(code)
+        if code in self._layer_keys and (best is None or not best[0].held):
+            self.held[code] = _Held("pending", (self.id, code))
+            return
+        self._resolve(code, best)
+
+    def _resolve(self, code: int, best: tuple[_Compiled, list[int]] | None) -> None:
         owner = (self.id, code)
         if best is None:
             self._restore(keep=())
@@ -324,6 +367,11 @@ class Engine:
         if (self._chords and not self._session_dirty and code in self.held and len(self.held) >= 2
                 and set(self.held) == self._session_keys and all(self._modlike(k) for k in self.held)):
             self._fire_chord()
+        h = self.held.get(code)
+        if h is not None and h.kind == "pending":
+            # a layer key tapped on its own: it types itself (its own mapping, if any)
+            del self.held[code]
+            self._resolve(code, self._best(code))
         h = self.held.pop(code, None)
         if h is None:
             return

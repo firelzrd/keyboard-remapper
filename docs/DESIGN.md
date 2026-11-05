@@ -78,6 +78,9 @@ UI: **GTK4 + libadwaita** (PyGObject): follows the GNOME look, light/dark, HiDPI
 - When a mapping fires, the trigger's modifiers are **suppressed** (hidden from the output), not released permanently, and **restored lazily**: only when a later key press needs them. Holding Ctrl and pressing J ten times gives ten `Down` taps and no Ctrl events; Ctrl then C gives Ctrl+C.
 - Modifiers outside the trigger stay active (`Ctrl+J → ↓` plus Shift = Shift+↓).
 - Suppressing Super / Alt first slips in a harmless key (F24) so the desktop does not treat it as a lone tap (Activities overview, menu-bar focus).
+- Layer keys (a non-modifier held in some trigger, `Muhenkan + H`) are deferred: tapped alone they type
+  themselves (or their own mapping) on release; used in a trigger they type nothing; an unrelated
+  non-modifier press flushes them first. Keys remapped to a modifier are never deferred.
 - A key remapped to a single key counts as that key for triggers (`CapsLock → Ctrl` + `Ctrl+J → ↓`).
 - Auto-repeat from the input side is dropped; the desktop repeats held keys itself.
 - Stopping, switching presets or unplugging releases every held output.

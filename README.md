@@ -67,6 +67,10 @@ GUI (keyboard-remapper, user)  ──JSON over Unix socket──▶  keyboard-re
 - A trigger made only of modifiers (e.g. `Left Shift + Left Ctrl → Caps Lock`) fires when the keys are pressed together and
   released with no other key in between, in either order. Ctrl+Shift+T and friends keep working, because the modifiers pass
   through normally until then.
+- **Layer keys**: a normal key used as the held part of a trigger (e.g. `Muhenkan + H → ←`, `Space + J → ↓`)
+  types itself only when pressed and released on its own; used in a combination it types nothing, so Muhenkan
+  does not also reach the input method. While held alone it waits (no auto-repeat); pressing an unrelated key
+  makes it type first, so fast typing keeps its order.
 - A key remapped to a single key counts as that key in triggers: with `CapsLock → Ctrl` and
   `Ctrl+J → ↓`, holding CapsLock and pressing J gives ↓.
 

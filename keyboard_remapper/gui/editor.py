@@ -365,11 +365,37 @@ class Editor(Gtk.Box):
                     f"→ Pressing {trig} runs {len(m.action.steps)} steps in order.")
         else:
             txt = T(f"→ {trig} は無効になります。", f"→ {trig} is disabled.")
+        layer = self._layer_keys(m)
+        if layer:
+            names = ("・" if LANG == "ja" else " / ").join(keys.key_name(n, LANG) for n in layer)
+            txt += T(f"\n{names} は、単独で押して離したときだけ入力されます (組み合わせに使うと入力されません)。",
+                     f"\n{names} types itself only when pressed and released on its own, "
+                     "not when used in a combination.")
         l = Gtk.Label(label=txt, xalign=0)
         l.add_css_class("summary-line")
         l.set_wrap(True)
         self.summary = l
         return l
+
+    def _layer_keys(self, m: Mapping) -> list[str]:
+        """Held non-modifier keys of *m* that the engine defers (see Engine._press)."""
+        if is_chord_tap(m.trigger):
+            return []
+        try:
+            preset = self.win.cfg().preset
+        except (AttributeError, KeyError):
+            preset = None
+        out = []
+        for n in m.held:
+            if any(keys.is_modifier(c) for c in keys.spec_codes(n)):
+                continue
+            alias = preset.find((n,)) if preset is not None else None
+            if (alias is not None and alias.action.type == ACTION_KEY
+                    and len(alias.action.output) == 1
+                    and all(keys.is_modifier(c) for c in alias.action.output_codes())):
+                continue                         # remapped to a modifier: acts at once
+            out.append(n)
+        return out
 
     def refresh_summary(self) -> None:
         """Update only the sentence (keeps open popovers alive while editing)."""

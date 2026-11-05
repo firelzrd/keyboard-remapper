@@ -165,7 +165,7 @@ def test_swap_keys():
 def test_non_modifier_held_key_combo():
     r = Rig((("SPACE", "J"), ("DOWN",)))
     r.down("SPACE", "J")
-    assert r.take() == [("SPACE", 1), ("SPACE", 0), ("DOWN", 1)]
+    assert r.take() == [("DOWN", 1)]                 # Space is used as a layer: it types nothing
 
 
 def test_remapped_modifier_counts_as_held_trigger_key():
@@ -268,3 +268,79 @@ def test_fired_sequence_timers_are_forgotten():
         r.sched.advance(10)
     assert r.engine._timers == []
     assert not r.out.pressed
+
+
+def test_layer_key_types_nothing_when_used_as_layer():
+    """Muhenkan + H/J/K/L -> arrows: Muhenkan itself must not reach the IME."""
+    r = Rig((("MUHENKAN", "H"), ("LEFT",)), (("MUHENKAN", "L"), ("RIGHT",)))
+    r.down("MUHENKAN")
+    assert r.take() == []
+    r.tap("H")
+    r.tap("L")
+    r.up("MUHENKAN")
+    assert r.take() == [("LEFT", 1), ("LEFT", 0), ("RIGHT", 1), ("RIGHT", 0)]
+
+
+def test_layer_key_tapped_alone_types_itself():
+    r = Rig((("MUHENKAN", "H"), ("LEFT",)))
+    r.down("MUHENKAN")
+    assert r.take() == []
+    r.up("MUHENKAN")
+    assert r.take() == [("MUHENKAN", 1), ("MUHENKAN", 0)]
+
+
+def test_layer_key_tapped_alone_uses_its_own_mapping():
+    """CapsLock disabled alone (or remapped) and used as a layer key."""
+    r = Rig((("CAPSLOCK",), "disable"), (("CAPSLOCK", "H"), ("LEFT",)))
+    r.tap("CAPSLOCK")
+    assert r.take() == []
+    r = Rig((("CAPSLOCK",), ("ESC",)), (("CAPSLOCK", "H"), ("LEFT",)))
+    r.tap("CAPSLOCK")
+    assert r.take() == [("ESC", 1), ("ESC", 0)]
+    r.down("CAPSLOCK")
+    r.tap("H")
+    r.up("CAPSLOCK")
+    assert r.take() == [("LEFT", 1), ("LEFT", 0)]
+
+
+def test_layer_key_rolled_into_other_key_keeps_order():
+    """Fast typing "space, a" with Space as a layer key: nothing is lost or reordered."""
+    r = Rig((("SPACE", "J"), ("DOWN",)))
+    r.down("SPACE")
+    r.down("A")
+    r.up("SPACE")
+    r.up("A")
+    assert r.take() == [("SPACE", 1), ("A", 1), ("SPACE", 0), ("A", 0)]
+
+
+def test_layer_key_with_modifier_outside_trigger():
+    r = Rig((("MUHENKAN", "H"), ("LEFT",)))
+    r.down("MUHENKAN", "LEFTSHIFT")
+    r.tap("H")
+    r.up("LEFTSHIFT", "MUHENKAN")
+    assert r.take() == [("LEFTSHIFT", 1), ("LEFT", 1), ("LEFT", 0), ("LEFTSHIFT", 0)]
+
+
+def test_layer_key_with_modifier_only_tap():
+    """Shift held, layer key tapped: Shift + key, as typed."""
+    r = Rig((("MUHENKAN", "H"), ("LEFT",)))
+    r.down("LEFTSHIFT", "MUHENKAN")
+    r.up("MUHENKAN", "LEFTSHIFT")
+    assert r.take() == [("LEFTSHIFT", 1), ("MUHENKAN", 1), ("MUHENKAN", 0), ("LEFTSHIFT", 0)]
+
+
+def test_remapped_modifier_is_not_deferred():
+    """CapsLock -> Ctrl plus CapsLock + H -> Left: CapsLock must act as Ctrl at once (Ctrl+click)."""
+    r = Rig((("CAPSLOCK",), ("LEFTCTRL",)), (("CAPSLOCK", "H"), ("LEFT",)))
+    r.down("CAPSLOCK")
+    assert r.take() == [("LEFTCTRL", 1)]
+    r.tap("H")
+    assert ("LEFT", 1) in r.take()
+
+
+def test_two_layer_keys_only_the_used_one_is_swallowed():
+    r = Rig((("MUHENKAN", "H"), ("LEFT",)), (("HENKAN", "J"), ("DOWN",)))
+    r.down("HENKAN", "MUHENKAN")
+    r.tap("H")
+    r.up("MUHENKAN", "HENKAN")
+    assert r.take() == [("HENKAN", 1), ("LEFT", 1), ("LEFT", 0), ("HENKAN", 0)]
